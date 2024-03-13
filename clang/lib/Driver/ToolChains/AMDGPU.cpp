@@ -1066,9 +1066,9 @@ bool AMDGPUToolChain::shouldSkipSanitizeOption(
 
   auto &Diags = TC.getDriver().getDiags();
 
-  // For simplicity, we only allow -fsanitize=address
+  // For simplicity, we only allow -fsanitize=address and -fsanitize=thread
   SanitizerMask K = parseSanitizerValue(A->getValue(), /*AllowGroups=*/false);
-  if (K != SanitizerKind::Address)
+  if (K != SanitizerKind::Address && K != SanitizerKind::Thread)
     return true;
 
   llvm::StringMap<bool> FeatureMap;

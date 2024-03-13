@@ -52,9 +52,9 @@ static bool shouldSkipSanitizeOption(const ToolChain &TC,
 
   auto &Diags = TC.getDriver().getDiags();
 
-  // For simplicity, we only allow -fsanitize=address
+  // For simplicity, we only allow -fsanitize=address and -fsanitize=thread
   SanitizerMask K = parseSanitizerValue(A->getValue(), /*AllowGroups=*/false);
-  if (K != SanitizerKind::Address)
+  if (K != SanitizerKind::Address && K != SanitizerKind::Thread)
     return true;
 
   llvm::StringMap<bool> FeatureMap;
@@ -232,14 +232,14 @@ HIPAMDToolChain::HIPAMDToolChain(const Driver &D, const llvm::Triple &Triple,
   // Lookup binaries into the driver directory, this is used to
   // discover the clang-offload-bundler executable.
   getProgramPaths().push_back(getDriver().Dir);
-
   // Diagnose unsupported sanitizer options only once.
   if (!Args.hasFlag(options::OPT_fgpu_sanitize, options::OPT_fno_gpu_sanitize,
                     true))
     return;
+  
   for (auto *A : Args.filtered(options::OPT_fsanitize_EQ)) {
     SanitizerMask K = parseSanitizerValue(A->getValue(), /*AllowGroups=*/false);
-    if (K != SanitizerKind::Address)
+    if (K != SanitizerKind::Address && K != SanitizerKind::Thread)
       D.getDiags().Report(clang::diag::warn_drv_unsupported_option_for_target)
           << A->getAsString(Args) << getTriple().str();
   }

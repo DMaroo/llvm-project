@@ -40,18 +40,23 @@
 #include <string.h>
 
 int main(int argc, char *argv[]) {
+  if (argc < 3) {
+    fprintf(stderr, "Expected a file name and data name as an argument\n");
+    return -1;
+  }
+
   char *BufSource;
   size_t SizeSource;
   amd_comgr_data_t DataSource1;
-  amd_comgr_data_set_t DataSetIn, DataSetReloc, DataSetExec;
+  amd_comgr_data_set_t DataSetIn, DataSetReloc;
   amd_comgr_action_info_t DataAction;
   amd_comgr_status_t Status;
   const char *CodeGenOptions[] = {"-mllvm", "-amdgpu-early-inline-all",
-                                  "-fno-slp-vectorize"};
+                                  "-fno-slp-vectorize", "-fsanitize=thread", "-g", "-S", "-emit-llvm"};
   size_t CodeGenOptionsCount =
       sizeof(CodeGenOptions) / sizeof(CodeGenOptions[0]);
 
-  SizeSource = setBuf(TEST_OBJ_DIR "/source2.hip", &BufSource);
+  SizeSource = setBuf(argv[1], &BufSource);
 
   Status = amd_comgr_create_data_set(&DataSetIn);
   checkError(Status, "amd_comgr_create_data_set");
@@ -60,21 +65,20 @@ int main(int argc, char *argv[]) {
   checkError(Status, "amd_comgr_create_data");
   Status = amd_comgr_set_data(DataSource1, SizeSource, BufSource);
   checkError(Status, "amd_comgr_set_data");
-  Status = amd_comgr_set_data_name(DataSource1, "source1.hip");
+  Status = amd_comgr_set_data_name(DataSource1, argv[2]);
   checkError(Status, "amd_comgr_set_data_name");
   Status = amd_comgr_data_set_add(DataSetIn, DataSource1);
   checkError(Status, "amd_comgr_data_set_add");
 
   Status = amd_comgr_create_data_set(&DataSetReloc);
   checkError(Status, "amd_comgr_create_data_set");
-
   Status = amd_comgr_create_action_info(&DataAction);
   checkError(Status, "amd_comgr_create_action_info");
   Status =
       amd_comgr_action_info_set_language(DataAction, AMD_COMGR_LANGUAGE_HIP);
   checkError(Status, "amd_comgr_action_info_set_language");
   Status = amd_comgr_action_info_set_isa_name(DataAction,
-                                              "amdgcn-amd-amdhsa--gfx906");
+                                              "amdgcn-amd-amdhsa--gfx906:xnack+");
   checkError(Status, "amd_comgr_action_info_set_isa_name");
 
   Status = amd_comgr_action_info_set_option_list(DataAction, CodeGenOptions,
@@ -85,49 +89,26 @@ int main(int argc, char *argv[]) {
                                DataAction, DataSetIn, DataSetReloc);
   checkError(Status, "amd_comgr_do_action");
 
-  size_t Count;
-  Status = amd_comgr_action_data_count(DataSetReloc,
-                                       AMD_COMGR_DATA_KIND_RELOCATABLE, &Count);
-  checkError(Status, "amd_comgr_action_data_count");
-
-  if (Count != 1) {
-    printf("AMD_COMGR_ACTION_COMPILE_SOURCE_WITH_DEVICE_LIBS_TO_RELOCATABLE "
-           "Failed: "
-           "produced %zu RELOC objects (expected 1)\n",
-           Count);
-    exit(1);
-  }
-
-  Status = amd_comgr_create_data_set(&DataSetExec);
-  checkError(Status, "amd_comgr_create_data_set");
-
   Status = amd_comgr_action_info_set_option_list(DataAction, NULL, 0);
   checkError(Status, "amd_comgr_action_info_set_option_list");
 
-  Status = amd_comgr_do_action(AMD_COMGR_ACTION_LINK_RELOCATABLE_TO_EXECUTABLE,
-                               DataAction, DataSetReloc, DataSetExec);
-  checkError(Status, "amd_comgr_do_action");
+  amd_comgr_data_t DataOut;
+  Status = amd_comgr_action_data_get_data(
+        DataSetReloc, AMD_COMGR_DATA_KIND_RELOCATABLE, 0, &DataOut);
+    checkError(Status, "amd_comgr_action_data_get_data");
 
-  Status = amd_comgr_action_data_count(DataSetExec,
-                                       AMD_COMGR_DATA_KIND_EXECUTABLE, &Count);
-  checkError(Status, "amd_comgr_action_data_count");
-
-  if (Count != 1) {
-    printf("AMD_COMGR_ACTION_LINK_RELOCATABLE_TO_EXECUTABLE Failed: "
-           "produced %zu executable objects (expected 1)\n",
-           Count);
-    exit(1);
-  }
+  dumpData(DataOut, "reloc.out");
 
   Status = amd_comgr_release_data(DataSource1);
+  checkError(Status, "amd_comgr_release_data");
+  Status = amd_comgr_release_data(DataOut);
   checkError(Status, "amd_comgr_release_data");
   Status = amd_comgr_destroy_data_set(DataSetIn);
   checkError(Status, "amd_comgr_destroy_data_set");
   Status = amd_comgr_destroy_data_set(DataSetReloc);
   checkError(Status, "amd_comgr_destroy_data_set");
-  Status = amd_comgr_destroy_data_set(DataSetExec);
-  checkError(Status, "amd_comgr_destroy_data_set");
   Status = amd_comgr_destroy_action_info(DataAction);
   checkError(Status, "amd_comgr_destroy_action_info");
+  
   free(BufSource);
 }
