@@ -47,6 +47,8 @@
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
+#include <cstring>
+#include <iostream>
 
 using namespace llvm;
 
@@ -173,12 +175,12 @@ private:
 };
 
 void insertModuleCtor(Module &M) {
-  getOrCreateSanitizerCtorAndInitFunctions(
-      M, kTsanModuleCtorName, kTsanInitName, /*InitArgTypes=*/{},
-      /*InitArgs=*/{},
-      // This callback is invoked when the functions are created the first
-      // time. Hook them into the global ctors list in that case:
-      [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(M, Ctor, 0); });
+  // getOrCreateSanitizerCtorAndInitFunctions(
+  //     M, kTsanModuleCtorName, kTsanInitName, /*InitArgTypes=*/{},
+  //     /*InitArgs=*/{},
+  //     // This callback is invoked when the functions are created the first
+  //     // time. Hook them into the global ctors list in that case:
+  //     [&](Function *Ctor, FunctionCallee) { appendToGlobalCtors(M, Ctor, 0); });
 }
 }  // namespace
 
@@ -492,8 +494,9 @@ bool ThreadSanitizer::sanitizeFunction(Function &F,
                                        const TargetLibraryInfo &TLI) {
   // This is required to prevent instrumenting call to __tsan_init from within
   // the module constructor.
-  if (F.getName() == kTsanModuleCtorName)
+  if (F.getName() != "_Z10helloworldPi")
     return false;
+  
   // Naked functions can not have prologue/epilogue
   // (__tsan_func_entry/__tsan_func_exit) generated, so don't instrument them at
   // all.
@@ -582,6 +585,7 @@ bool ThreadSanitizer::sanitizeFunction(Function &F,
     }
     Res = true;
   }
+  std::cerr << "WHATTT! " << F.getName().str() << std::endl;
   return Res;
 }
 
