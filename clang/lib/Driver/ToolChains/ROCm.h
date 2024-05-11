@@ -131,6 +131,9 @@ private:
   // Asan runtime library
   SmallString<0> AsanRTL;
 
+  // Tsan runtime library
+  SmallString<0> TsanRTL;
+
   // Libraries swapped based on compile flags.
   ConditionalLibrary WavefrontSize64;
   ConditionalLibrary FiniteOnly;
@@ -236,6 +239,9 @@ public:
 
   /// Returns empty string of Asan runtime library is not available.
   StringRef getAsanRTLPath() const { return AsanRTL; }
+
+  /// Returns empty string of Tsan runtime library is not available.
+   StringRef getTsanRTLPath() const { return TsanRTL; }
 
   StringRef getWavefrontSize64Path(bool Enabled) const {
     return WavefrontSize64.get(Enabled);

@@ -104,6 +104,8 @@ void RocmInstallationDetector::scanLibDevicePath(llvm::StringRef Path) {
       HIP = FilePath;
     } else if (BaseName == "asanrtl") {
       AsanRTL = FilePath;
+    } else if (BaseName == "tsanrtl") {
+      TsanRTL = FilePath;
     } else if (BaseName == "oclc_finite_only_off") {
       FiniteOnly.Off = FilePath;
     } else if (BaseName == "oclc_finite_only_on") {

@@ -58,11 +58,9 @@ static bool shouldSkipSanitizeOption(const ToolChain &TC,
   return false;
 }
 
-void AMDGCN::Linker::constructLlvmLinkCommand(Compilation &C,
-                                         const JobAction &JA,
-                                         const InputInfoList &Inputs,
-                                         const InputInfo &Output,
-                                         const llvm::opt::ArgList &Args) const {
+void AMDGCN::Linker::constructLlvmLinkCommand(
+    Compilation &C, const JobAction &JA, const InputInfoList &Inputs,
+    const InputInfo &Output, const llvm::opt::ArgList &Args) const {
   // Construct llvm-link command.
   // The output from llvm-link is a bitcode file.
   ArgStringList LlvmLinkArgs;
@@ -82,7 +80,7 @@ void AMDGCN::Linker::constructLlvmLinkCommand(Compilation &C,
                              /*PostClangLink=*/false);
 
   const char *LlvmLink =
-    Args.MakeArgString(getToolChain().GetProgramPath("llvm-link"));
+      Args.MakeArgString(getToolChain().GetProgramPath("llvm-link"));
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
                                          LlvmLink, LlvmLinkArgs, Inputs,
                                          Output));
@@ -196,8 +194,7 @@ void AMDGCN::Linker::ConstructJob(Compilation &C, const JobAction &JA,
                                   const InputInfoList &Inputs,
                                   const ArgList &Args,
                                   const char *LinkingOutput) const {
-  if (Inputs.size() > 0 &&
-      Inputs[0].getType() == types::TY_Image &&
+  if (Inputs.size() > 0 && Inputs[0].getType() == types::TY_Image &&
       JA.getType() == types::TY_Object)
     return HIP::constructGenerateObjFileFromHIPFatBinary(C, Output, Inputs,
                                                          Args, JA, *this);
@@ -222,7 +219,7 @@ HIPAMDToolChain::HIPAMDToolChain(const Driver &D, const llvm::Triple &Triple,
   if (!Args.hasFlag(options::OPT_fgpu_sanitize, options::OPT_fno_gpu_sanitize,
                     true))
     return;
-  
+
   for (auto *A : Args.filtered(options::OPT_fsanitize_EQ)) {
     SanitizerMask K = parseSanitizerValue(A->getValue(), /*AllowGroups=*/false);
     if (K != SanitizerKind::Address && K != SanitizerKind::Thread)
@@ -233,8 +230,7 @@ HIPAMDToolChain::HIPAMDToolChain(const Driver &D, const llvm::Triple &Triple,
 
 void HIPAMDToolChain::addActionsFromClangTargetOptions(
     const llvm::opt::ArgList &DriverArgs, llvm::opt::ArgStringList &CC1Args,
-    const JobAction &JA, Compilation &C, const InputInfoList &Inputs) const {
-}
+    const JobAction &JA, Compilation &C, const InputInfoList &Inputs) const {}
 
 void HIPAMDToolChain::addClangTargetOptions(
     const llvm::opt::ArgList &DriverArgs, llvm::opt::ArgStringList &CC1Args,
@@ -394,14 +390,24 @@ HIPAMDToolChain::getDeviceLibs(const llvm::opt::ArgList &DriverArgs) const {
 
     // If --hip-device-lib is not set, add the default bitcode libraries.
     if (DriverArgs.hasFlag(options::OPT_fgpu_sanitize,
-                           options::OPT_fno_gpu_sanitize, true) &&
-        getSanitizerArgs(DriverArgs).needsAsanRt()) {
-      auto AsanRTL = RocmInstallation->getAsanRTLPath();
-      if (AsanRTL.empty()) {
-        getDriver().Diag(diag::err_drv_no_asan_rt_lib);
-        return {};
-      } else
-        BCLibs.emplace_back(AsanRTL, /*ShouldInternalize=*/false);
+                           options::OPT_fno_gpu_sanitize, true)) {
+      if (getSanitizerArgs(DriverArgs).needsAsanRt()) {
+        auto AsanRTL = RocmInstallation->getAsanRTLPath();
+        if (AsanRTL.empty()) {
+          getDriver().Diag(diag::err_drv_no_asan_rt_lib);
+          return {};
+        } else
+          BCLibs.emplace_back(AsanRTL, /*ShouldInternalize=*/false);
+      }
+      if (getSanitizerArgs(DriverArgs).needsTsanRt()) {
+        auto TsanRTL = RocmInstallation->getTsanRTLPath();
+        if (TsanRTL.empty()) {
+          getDriver().Diag(diag::err_drv_no_tsan_rt_lib);
+          return {};
+        } else {
+          BCLibs.emplace_back(TsanRTL, /*ShouldInternalize=*/false);
+        }
+      }
     }
 
     // Add the HIP specific bitcode library.

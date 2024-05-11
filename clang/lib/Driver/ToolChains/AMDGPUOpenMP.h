@@ -9,9 +9,9 @@
 #ifndef LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_AMDGPUOPENMP_H
 #define LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_AMDGPUOPENMP_H
 
-#include "clang/Driver/ToolChain.h"
-#include "clang/Driver/Tool.h"
 #include "AMDGPU.h"
+#include "clang/Driver/Tool.h"
+#include "clang/Driver/ToolChain.h"
 
 namespace clang {
 namespace driver {
@@ -33,10 +33,11 @@ class AMDGPUOpenMPToolChain;
 namespace tools {
 
 namespace AMDGCN {
-  // Construct command for creating HIP fatbin.
-  void constructHIPFatbinCommand(Compilation &C, const JobAction &JA,
-                  StringRef OutputFileName, const InputInfoList &Inputs,
-                  const llvm::opt::ArgList &TCArgs, const Tool& T);
+// Construct command for creating HIP fatbin.
+void constructHIPFatbinCommand(Compilation &C, const JobAction &JA,
+                               StringRef OutputFileName,
+                               const InputInfoList &Inputs,
+                               const llvm::opt::ArgList &TCArgs, const Tool &T);
 
 // Runs llvm-link/opt/llc/lld, which links multiple LLVM bitcode, together with
 // device library, then compiles it to ISA in a shared object.
@@ -69,8 +70,7 @@ class LLVM_LIBRARY_VISIBILITY AMDGPUOpenMPToolChain final
     : public ROCMToolChain {
 public:
   AMDGPUOpenMPToolChain(const Driver &D, const llvm::Triple &Triple,
-                        const ToolChain &HostTC,
-                        const llvm::opt::ArgList &Args,
+                        const ToolChain &HostTC, const llvm::opt::ArgList &Args,
                         const Action::OffloadKind OK);
   AMDGPUOpenMPToolChain(const Driver &D, const llvm::Triple &Triple,
                         const ToolChain &HostTC, const llvm::opt::ArgList &Args,
@@ -91,7 +91,9 @@ public:
   bool useIntegratedAs() const override { return true; }
   bool isCrossCompiling() const override { return true; }
   bool isPICDefault() const override { return false; }
-  bool isPIEDefault(const llvm::opt::ArgList &Args) const override { return false; }
+  bool isPIEDefault(const llvm::opt::ArgList &Args) const override {
+    return false;
+  }
   bool isPICDefaultForced() const override { return false; }
   bool SupportsProfiling() const override { return false; }
   bool IsMathErrnoDefault() const override { return false; }
@@ -114,6 +116,10 @@ public:
 
   StringRef getAsanRTLPath() const {
     return RocmInstallation->getAsanRTLPath();
+  }
+
+  StringRef getTsanRTLPath() const {
+    return RocmInstallation->getTsanRTLPath();
   }
 
   VersionTuple

@@ -12,6 +12,7 @@
 #include "HIPUtility.h"
 #include "ToolChains/ROCm.h"
 #include "clang/Basic/DiagnosticDriver.h"
+#include "clang/Config/config.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/DriverDiagnostic.h"
@@ -20,14 +21,13 @@
 #include "clang/Driver/SanitizerArgs.h"
 #include "clang/Driver/Tool.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringExtras.h"    
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatAdapters.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/TargetParser/TargetParser.h"
-#include "clang/Config/config.h"
 
 using namespace clang::driver;
 using namespace clang::driver::toolchains;
@@ -255,7 +255,8 @@ const char *amdgpu::dlr::getLinkCommandArgs(
   }
 
   // If device debugging turned on, add specially built bc files
-  StringRef libpath = Args.MakeArgString(C.getDriver().Dir + "/../" + LibSuffix);
+  StringRef libpath =
+      Args.MakeArgString(C.getDriver().Dir + "/../" + LibSuffix);
   std::string lib_debug_perf_path = FindDebugPerfInLibraryPath(LibSuffix);
   if (!lib_debug_perf_path.empty())
     libpath = lib_debug_perf_path;
@@ -263,14 +264,24 @@ const char *amdgpu::dlr::getLinkCommandArgs(
   llvm::SmallVector<std::string, 12> BCLibs;
 
   if (Args.hasFlag(options::OPT_fgpu_sanitize, options::OPT_fno_gpu_sanitize,
-                   true) &&
-      TC.getSanitizerArgs(Args).needsAsanRt()) {
-    std::string AsanRTL(RocmInstallation.getAsanRTLPath());
-    if (AsanRTL.empty()) {
-      if (!Args.hasArg(options::OPT_nogpulib))
-        TC.getDriver().Diag(diag::err_drv_no_asan_rt_lib);
-    } else {
-      BCLibs.push_back(AsanRTL);
+                   true)) {
+    if (TC.getSanitizerArgs(Args).needsAsanRt()) {
+      std::string AsanRTL(RocmInstallation.getAsanRTLPath());
+      if (AsanRTL.empty()) {
+        if (!Args.hasArg(options::OPT_nogpulib))
+          TC.getDriver().Diag(diag::err_drv_no_asan_rt_lib);
+      } else {
+        BCLibs.push_back(AsanRTL);
+      }
+    }
+    if (TC.getSanitizerArgs(Args).needsTsanRt()) {
+      std::string TsanRTL(RocmInstallation.getTsanRTLPath());
+      if (TsanRTL.empty()) {
+        if (!Args.hasArg(options::OPT_nogpulib))
+          TC.getDriver().Diag(diag::err_drv_no_tsan_rt_lib);
+      } else {
+        BCLibs.push_back(TsanRTL);
+      }
     }
   }
   StringRef GPUArch = getProcessorFromTargetID(Triple, TargetID);
@@ -378,9 +389,11 @@ const char *amdgpu::dlr::getLldCommandArgs(
   return LldOutputFile;
 }
 
-AMDGPUOpenMPToolChain::AMDGPUOpenMPToolChain(const Driver &D, const llvm::Triple &Triple,
-                             const ToolChain &HostTC, const ArgList &Args,
-                             const Action::OffloadKind OK)
+AMDGPUOpenMPToolChain::AMDGPUOpenMPToolChain(const Driver &D,
+                                             const llvm::Triple &Triple,
+                                             const ToolChain &HostTC,
+                                             const ArgList &Args,
+                                             const Action::OffloadKind OK)
     : ROCMToolChain(D, Triple, Args), HostTC(HostTC), OK(OK) {
   // Lookup binaries into the driver directory, this is used to
   // discover the 'amdgpu-arch' executable.
@@ -440,10 +453,10 @@ void AMDGPUOpenMPToolChain::addClangTargetOptions(
     CC1Args.push_back("-fgpu-rdc");
 
   StringRef MaxThreadsPerBlock =
-    DriverArgs.getLastArgValue(options::OPT_gpu_max_threads_per_block_EQ);
+      DriverArgs.getLastArgValue(options::OPT_gpu_max_threads_per_block_EQ);
   if (!MaxThreadsPerBlock.empty()) {
     std::string ArgStr =
-      std::string("--gpu-max-threads-per-block=") + MaxThreadsPerBlock.str();
+        std::string("--gpu-max-threads-per-block=") + MaxThreadsPerBlock.str();
     CC1Args.push_back(DriverArgs.MakeArgStringRef(ArgStr));
   }
 
@@ -474,8 +487,7 @@ void AMDGPUOpenMPToolChain::addClangTargetOptions(
   ArgStringList LibraryPaths;
 
   // Find in --hip-device-lib-path and HIP_LIBRARY_PATH.
-  for (auto Path :
-       RocmInstallation->getRocmDeviceLibPathArg())
+  for (auto Path : RocmInstallation->getRocmDeviceLibPathArg())
     LibraryPaths.push_back(DriverArgs.MakeArgString(Path));
 
   // Link the bitcode library late if we're using device LTO.
@@ -550,8 +562,8 @@ AMDGPUOpenMPToolChain::GetCXXStdlibType(const ArgList &Args) const {
   return HostTC.GetCXXStdlibType(Args);
 }
 
-void AMDGPUOpenMPToolChain::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
-                                              ArgStringList &CC1Args) const {
+void AMDGPUOpenMPToolChain::AddClangSystemIncludeArgs(
+    const ArgList &DriverArgs, ArgStringList &CC1Args) const {
   const Driver &D = HostTC.getDriver();
   CC1Args.push_back("-internal-isystem");
   CC1Args.push_back(DriverArgs.MakeArgString(D.Dir + "/../include"));
@@ -598,8 +610,8 @@ static void AddFlangSysIncludeArg(const ArgList &DriverArgs,
 }
 
 /// Currently only adding include dir from install directory
-void AMDGPUOpenMPToolChain::AddFlangSystemIncludeArgs(const ArgList &DriverArgs,
-                                            ArgStringList &Flang1args) const {
+void AMDGPUOpenMPToolChain::AddFlangSystemIncludeArgs(
+    const ArgList &DriverArgs, ArgStringList &Flang1args) const {
   path_list IncludePathList;
   const Driver &D = getDriver();
 
@@ -616,9 +628,8 @@ void AMDGPUOpenMPToolChain::AddFlangSystemIncludeArgs(const ArgList &DriverArgs,
   return;
 }
 
-
-void AMDGPUOpenMPToolChain::AddClangCXXStdlibIncludeArgs(const ArgList &Args,
-                                                 ArgStringList &CC1Args) const {
+void AMDGPUOpenMPToolChain::AddClangCXXStdlibIncludeArgs(
+    const ArgList &Args, ArgStringList &CC1Args) const {
   HostTC.AddClangCXXStdlibIncludeArgs(Args, CC1Args);
 }
 
