@@ -89,6 +89,7 @@ add_subdirectory(ockl)
 add_subdirectory(opencl)
 add_subdirectory(hip)
 add_subdirectory(asanrtl)
+add_subdirectory(tsanrtl)
 
 enable_testing()
 add_subdirectory(test/compile)
