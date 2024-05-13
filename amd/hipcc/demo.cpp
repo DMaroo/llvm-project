@@ -38,23 +38,21 @@ typedef struct access_t {
   bool is_write;
 } Access;
 
-constexpr uint64_t ACCESS_SIZE = (1 << 16);
+static constexpr uint64_t ACCESS_SIZE = (1 << 16);
 
 __device__ Access accesses[ACCESS_SIZE];
-__device__ uint64_t global_clock;
+__device__ uint64_t global_clock = 1;
 __device__ uint32_t write_lock;
 __device__ bool race;
 
 extern "C" __device__ void __tsan_func_entry(void *pc) {
-  global_clock = 1;
   printf("Entered a function\n");
-  race = false;
   write_lock = 0;
 }
 
 extern "C" __device__ void __tsan_write4(void *mem) {
   bool leaveLoop = false;
-  uint64_t access_index = (((uint64_t) mem >> 2) & (ACCESS_SIZE - 1));
+  uint64_t access_index = (((uint64_t)mem >> 2) & (ACCESS_SIZE - 1));
   uint64_t index = blockDim.x * blockIdx.x + threadIdx.x;
   while (!leaveLoop) {
     if (atomicExch(&write_lock, 1) == 0) {
@@ -71,7 +69,10 @@ extern "C" __device__ void __tsan_write4(void *mem) {
         }
         uint64_t tidx = threadIdx.x;
         uint64_t bidx = blockIdx.x;
-        printf("Data race at %p: \t\t%s by (%lu, %lu), \t\tWritten by (%lu, %lu)\n", mem, op, accesses[access_index].thread / blockDim.x, accesses[access_index].thread % blockDim.x, bidx, tidx);
+        printf("Data race at %p: \t\t%s by (%lu, %lu), \t\tWritten by (%lu, "
+               "%lu)\n",
+               mem, op, accesses[access_index].thread / blockDim.x,
+               accesses[access_index].thread % blockDim.x, bidx, tidx);
       }
       accesses[access_index].access_time = global_clock;
       accesses[access_index].thread = index;
@@ -84,7 +85,7 @@ extern "C" __device__ void __tsan_write4(void *mem) {
 
 extern "C" __device__ void __tsan_read4(void *mem) {
   bool leaveLoop = false;
-  uint64_t access_index = (((uint64_t) mem >> 2) & (ACCESS_SIZE - 1));
+  uint64_t access_index = (((uint64_t)mem >> 2) & (ACCESS_SIZE - 1));
   uint64_t index = blockDim.x * blockIdx.x + threadIdx.x;
   while (!leaveLoop) {
     if (atomicExch(&write_lock, 1) == 0) {
@@ -95,7 +96,10 @@ extern "C" __device__ void __tsan_read4(void *mem) {
         race = true;
         uint64_t tidx = threadIdx.x;
         uint64_t bidx = blockIdx.x;
-        printf("Data race at %p: \t\tWritten by (%lu, %lu), \t\tRead by (%lu, %lu)\n", mem, accesses[access_index].thread / blockDim.x, accesses[access_index].thread % blockDim.x, bidx, tidx);
+        printf("Data race at %p: \t\tWritten by (%lu, %lu), \t\tRead by (%lu, "
+               "%lu)\n",
+               mem, accesses[access_index].thread / blockDim.x,
+               accesses[access_index].thread % blockDim.x, bidx, tidx);
       }
       accesses[access_index].access_time = global_clock;
       accesses[access_index].thread = index;
@@ -106,22 +110,24 @@ extern "C" __device__ void __tsan_read4(void *mem) {
   }
 }
 
-extern "C" __device__ void __tsan_func_exit() {
-  printf("Exited a function\n");
-  if (race) {
-    printf("Data race detected!\n");
-  }
+extern "C" __device__ void __tsan_func_exit() { printf("Exited a function\n"); }
+
+typedef enum {
+  mo_relaxed,
+  mo_consume,
+  mo_acquire,
+  mo_release,
+  mo_acq_rel,
+  mo_seq_cst
+} morder;
+
+extern "C" __device__ int64_t __tsan_atomic64_fetch_add(volatile int64_t *a,
+                                                        int64_t v, morder mo) {
+  global_clock++;
+  return 0LL;
 }
 
-// __device__ void __tsan_init() { return; }
-
-// __device__ void __tsan_func_entry(void *pc) { return; }
-
-// __device__ void __tsan_write4(void *mem) { return; }
-
-// __device__ void __tsan_func_exit() { return; }
-
-__global__ void helloworld(int *a) { *a += 5; }
+__global__ void helloworld(int *a) { atomicAdd(a, 5); }
 
 #define HIP_CHECK(condition)                                                   \
   do {                                                                         \

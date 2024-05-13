@@ -494,8 +494,12 @@ bool ThreadSanitizer::sanitizeFunction(Function &F,
                                        const TargetLibraryInfo &TLI) {
   // This is required to prevent instrumenting call to __tsan_init from within
   // the module constructor.
-  if (F.getName() != "_Z10helloworldPi")
+  if (F.getName() == kTsanModuleCtorName)
     return false;
+
+  if (F.getName() != "_Z10helloworldPi" && F.getName() != "_Z9atomicAddPii") {
+    return false;
+  }
   
   // Naked functions can not have prologue/epilogue
   // (__tsan_func_entry/__tsan_func_exit) generated, so don't instrument them at
