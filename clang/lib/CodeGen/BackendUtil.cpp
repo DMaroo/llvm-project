@@ -682,7 +682,7 @@ static void addSanitizers(const Triple &TargetTriple,
     MSanPass(SanitizerKind::Memory, false);
     MSanPass(SanitizerKind::KernelMemory, true);
 
-    if (LangOpts.Sanitize.has(SanitizerKind::Thread)) {
+    if (LangOpts.Sanitize.has(SanitizerKind::Thread) && TargetTriple.isAMDGPU()) {
       MPM.addPass(ModuleThreadSanitizerPass());
       MPM.addPass(createModuleToFunctionPassAdaptor(ThreadSanitizerPass()));
     }
